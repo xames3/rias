@@ -13,9 +13,9 @@ Last updated on: Sunday, June 23 2024
 from __future__ import annotations
 
 import copy
+import functools
 import operator
 import typing as t
-from functools import wraps
 
 T = t.TypeVar("T")
 
@@ -29,18 +29,18 @@ empty = object()
 def lazy_proxy_method(func: t.Callable[..., T]) -> t.Callable[..., T]:
     """A proxy method to delay the evaluation of the wrapped object."""
 
-    @wraps(func)
-    def inner(self: LazyObject, *args: t.Any) -> T:
-        if (_wrapped := self._wrapped) is empty:
-            self._load()
-            _wrapped = self._wrapped
-        return func(_wrapped, *args)
+    @functools.wraps(func)
+    def inner(self: LazyLoader, *args: t.Any) -> T:
+        if (wrapped := self.wrapped) is empty:
+            self.load()
+            wrapped = self.wrapped
+        return func(wrapped, *args)
 
-    inner._mask_wrapped = False  # type: ignore[attr-defined]
+    inner.mask_wrapped = False  # type: ignore[attr-defined]
     return inner
 
 
-class LazyObject:
+class LazyLoader:
     """Base class to delay instantiation of the dervied class.
 
     This class delays the creation of an expensive object until it is
@@ -48,23 +48,23 @@ class LazyObject:
     the instantiation.
     """
 
-    _wrapped: object | None = None
+    wrapped: object | None = None
 
     def __init__(self) -> None:
         """Initialize the lazy instance with a sentinel."""
-        # NOTE (xames3): If a subclass overrides ``__init__()``, it
-        # must also override the ``__copy__()`` and ``__deepcopy__()``.
-        self._wrapped = empty
+        # NOTE (xames3): If a subclass overrides __init__(), it must
+        # also override the __copy__() and __deepcopy__().
+        self.wrapped = empty
 
     def __getattribute__(self, name: str) -> t.Any:
         """Retrieve an attribute from the instance."""
-        if name == "_wrapped":
+        if name == "wrapped":
             # Directly access the sentinel to avoid recursion.
             return super().__getattribute__(name)
         value = super().__getattribute__(name)
         # If the attribute (name) is a proxy method, raise an error to
-        # call ``__getattr__()`` and use the wrapped object method.
-        if not getattr(value, "_mask_wrapped", True):
+        # call __getattr__() and use the wrapped object method.
+        if not getattr(value, "mask_wrapped", True):
             raise AttributeError
         return value
 
@@ -72,42 +72,42 @@ class LazyObject:
 
     def __setattr__(self, name: str, value: t.Any) -> None:
         """Set an attribute on the instance."""
-        if name == "_wrapped":
+        if name == "wrapped":
             # Directly assign to avoid infinite recursion.
-            self.__dict__["_wrapped"] = value
+            self.__dict__["wrapped"] = value
         else:
-            if self._wrapped is empty:
-                self._load()
-            setattr(self._wrapped, name, value)
+            if self.wrapped is empty:
+                self.load()
+            setattr(self.wrapped, name, value)
 
     def __delattr__(self, name: str) -> None:
         """Delete an attribute from the instance."""
-        if name == "_wrapped":
-            raise TypeError("Can't delete '_wrapped' attribute")
-        if self._wrapped is empty:
-            self._load()
-        delattr(self._wrapped, name)
+        if name == "wrapped":
+            raise TypeError("Can't delete 'wrapped' attribute")
+        if self.wrapped is empty:
+            self.load()
+        delattr(self.wrapped, name)
 
-    def _load(self) -> None:
+    def load(self, *args: t.Any, **kwargs: t.Any) -> None:
         """Must be implemented by the subclasses."""
-        raise NotImplementedError("Subclasses must implement _load() method.")
+        raise NotImplementedError("Subclasses must implement load() method.")
 
-    def __copy__(self) -> LazyObject:
+    def __copy__(self) -> LazyLoader:
         """Return a shallow copy of the instance."""
         # If uninitialized, copy the wrapper else return the copy of the
         # wrapped object.
-        if self._wrapped is empty:
+        if self.wrapped is empty:
             return type(self)()
         else:
-            return copy.copy(self._wrapped)  # type: ignore[return-value]
+            return copy.copy(self.wrapped)  # type: ignore[return-value]
 
     def __deepcopy__(self, memo: dict[int, t.Any]) -> t.Any:
         """Return a deep copy of the instance."""
-        if self._wrapped is empty:
+        if self.wrapped is empty:
             output = type(self)()
             memo[id(self)] = output
             return output
-        return copy.deepcopy(self._wrapped, memo)
+        return copy.deepcopy(self.wrapped, memo)
 
     __class__ = property(  # type: ignore[assignment]
         lazy_proxy_method(operator.attrgetter("__class__"))
