@@ -1,0 +1,7 @@
+black
+isort
+matplotlib
+mypy
+numpy
+pytest
+torch
