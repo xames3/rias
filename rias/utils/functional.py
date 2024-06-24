@@ -1,13 +1,14 @@
 """\
-Rias
-====
+Rias Functional Utilities
+=========================
 
 Author: XA <xa@mes3.dev>
 Created on: Sunday, June 23 2024
 Last updated on: Sunday, June 23 2024
 
-:copyright: (c) 2024 XA. All rights reserved.
-:license: MIT, see LICENSE for more details.
+This module contains functional utilities for the Rias framework. These
+utilities include classes and functions that support lazy loading, proxy
+methods, and other functional programming techniques.
 """
 
 from __future__ import annotations
@@ -26,38 +27,76 @@ T = t.TypeVar("T")
 empty = object()
 
 
-def lazy_proxy_method(func: t.Callable[..., T]) -> t.Callable[..., T]:
-    """A proxy method to delay the evaluation of the _wrapped object."""
+def lazy_proxy_method(method: t.Callable[..., T]) -> t.Callable[..., T]:
+    """A decorator to define a lazy proxy method.
 
-    @functools.wraps(func)
-    def inner(self: LazyLoader, *args: t.Any) -> T:
+    This function returns a decorator that can be used to define methods
+    on the LazyLoader class that forward their calls to the underlying
+    object once it is loaded.
+
+    :param method: The method to be proxied.
+    :return: A decorated method that forwards to the proxied method.
+    """
+
+    @functools.wraps(method)
+    def _proxy(self: LazyLoader, *args: t.Any, **kwargs: t.Any) -> T:
         if (_wrapped := self._wrapped) is empty:
             self._load()
             _wrapped = self._wrapped
-        return func(_wrapped, *args)
+        return method(_wrapped, *args, **kwargs)
 
-    inner._mask_wrapped = False  # type: ignore[attr-defined]
-    return inner
+    _proxy._mask_wrapped = False  # type: ignore[attr-defined]
+    return _proxy
 
 
 class LazyLoader:
-    """Base class to delay instantiation of the dervied class.
+    """A base class for lazy loading (delay instantiation).
 
-    This class delays the creation of an expensive object until it is
-    actually needed. By subclassing this, you can intercept and alter
-    the instantiation.
+    This class provides a mechanism for deferring the initialization
+    of an object until it is accessed for the first time. It acts as a
+    proxy that forwards all attribute and method accesses to the
+    underlying object once it is initialized.
+
+    :var _wrapped: The underlying object (module, function or class)
+                   that is going to be wrapped by the child class or
+                   lazily loaded, defaults to None.
     """
 
     _wrapped: object | None = None
 
     def __init__(self) -> None:
-        """Initialize the lazy instance with a sentinel."""
+        """Initialize the lazy loader.
+
+        This constructor initializes the _wrapped attribute to the
+        sentinel value `empty`, indicating that the underlying object
+        has not been loaded yet.
+        """
         # NOTE (xames3): If a subclass overrides __init__(), it must
         # also override the __copy__() and __deepcopy__().
         self._wrapped = empty
 
+    def _load(self, *args: t.Any, **kwargs: t.Any) -> None:
+        """Load the underlying object.
+
+        This method is a placeholder that must be implemented by
+        subclasses to initialize the underlying object. It is called
+        automatically when the lazy proxy is accessed for the first time.
+
+        :raises NotImplementedError: If not implemented by the subclass.
+        """
+        raise NotImplementedError("Subclasses must implement _load() method.")
+
     def __getattribute__(self, name: str) -> t.Any:
-        """Retrieve an attribute from the instance."""
+        """Forward attribute access to the underlying object.
+
+        This method is called when an attribute is accessed on the lazy
+        proxy. It triggers the loading of the underlying object if it
+        has not been loaded yet, and then forwards the attribute access
+        to it.
+
+        :param name: The name of the attribute to access.
+        :return: The value of the attribute on the underlying object.
+        """
         if name == "_wrapped":
             # Directly access the sentinel to avoid recursion.
             return super().__getattribute__(name)
@@ -71,7 +110,16 @@ class LazyLoader:
     __getattr__: t.Callable[..., t.Any] = lazy_proxy_method(getattr)
 
     def __setattr__(self, name: str, value: t.Any) -> None:
-        """Set an attribute on the instance."""
+        """Forward attribute assignment to the underlying object.
+
+        This method is called when an attribute is assigned on the lazy
+        proxy. It triggers the loading of the underlying object if it
+        has not been loaded yet, and then forwards the attribute
+        assignment to it.
+
+        :param name: The name of the attribute to assign.
+        :param value: The value to assign to the attribute.
+        """
         if name == "_wrapped":
             # Directly assign to avoid infinite recursion.
             self.__dict__["_wrapped"] = value
@@ -88,12 +136,15 @@ class LazyLoader:
             self._load()
         delattr(self._wrapped, name)
 
-    def _load(self, *args: t.Any, **kwargs: t.Any) -> None:
-        """Must be implemented by the subclasses."""
-        raise NotImplementedError("Subclasses must implement _load() method.")
-
     def __copy__(self) -> LazyLoader:
-        """Return a shallow copy of the instance."""
+        """Return a shallow copy of the lazy loader.
+
+        This method creates a shallow copy of the lazy proxy. If the
+        underlying object has not been loaded yet, the copy remains
+        uninitialized. Otherwise, the copy is of the loaded object.
+
+        :return: A shallow copy of the lazy loader.
+        """
         # If uninitialized, copy the wrapper else return the copy of the
         # _wrapped object.
         if self._wrapped is empty:
@@ -102,7 +153,16 @@ class LazyLoader:
             return copy.copy(self._wrapped)  # type: ignore[return-value]
 
     def __deepcopy__(self, memo: dict[int, t.Any]) -> t.Any:
-        """Return a deep copy of the instance."""
+        """Return a deep copy of the lazy loader.
+
+        This method creates a deep copy of the lazy proxy. If the
+        underlying object has not been loaded yet, the deep copy remains
+        uninitialized. Otherwise, the deep copy is of the loaded object.
+
+        :param memo: A dictionary of objects already copied during the
+                     current copying pass.
+        :return: A deep copy of the lazy loader.
+        """
         if self._wrapped is empty:
             output = type(self)()
             memo[id(self)] = output
