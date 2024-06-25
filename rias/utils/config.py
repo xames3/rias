@@ -4,7 +4,7 @@ Rias Configuration Management
 
 Author: XA <xa@mes3.dev>
 Created on: Sunday, June 23 2024
-Last updated on: Sunday, June 23 2024
+Last updated on: Monday, June 24 2024
 
 This module manages all configurations for the Rias framework. It
 provides access to configuration values defined in Rias' defaults module
@@ -66,8 +66,8 @@ class ConfigurationStore:
     def __repr__(self) -> str:
         """Return a string representation of the configuration store."""
         if self._user_module:
-            return f"<{self.__class__.__name__}: {self._user_module!r}>"
-        return f"<{self.__class__.__name__}: {defaults.__name__!r}>"
+            return f"{self.__class__.__name__}({self._user_module!r})"
+        return f"{self.__class__.__name__}({defaults.__name__!r})"
 
 
 class LazyConfigurationStore(LazyLoader):
@@ -98,7 +98,7 @@ class LazyConfigurationStore(LazyLoader):
         is initialized.
     """
 
-    def _load(self, name: str | None = None) -> None:
+    def _load(self) -> None:
         """Load the underlying ConfigurationStore instance.
 
         This method initializes the ConfigurationStore instance and
@@ -114,13 +114,13 @@ class LazyConfigurationStore(LazyLoader):
     def __repr__(self) -> str:
         """Return a string representation of the lazy config store."""
         if self._wrapped is empty:
-            return f"<LazyConfigurationStore: 'default'>"
+            return f"LazyConfigurationStore('default')"
         return repr(self._wrapped)
 
     def __getattr__(self, name: str) -> t.Any:
         """Retrieve the value of a configuration and cache it."""
         if (_wrapped := self._wrapped) is empty:
-            self._load(name)
+            self._load()
             _wrapped = self._wrapped
         value = getattr(_wrapped, name)
         self.__dict__[name] = value
