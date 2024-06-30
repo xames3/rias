@@ -4,7 +4,7 @@ Rias Configuration Management
 
 Author: XA <xa@mes3.dev>
 Created on: Sunday, June 23 2024
-Last updated on: Monday, June 24 2024
+Last updated on: Saturday, June 29 2024
 
 This module manages all configurations for the Rias framework. It
 provides access to configuration values defined in Rias' defaults module
@@ -27,7 +27,7 @@ VT = t.TypeVar("VT")
 _USER_CONFIG_MODULE: t.Final[str] = "USER_CONFIG_MODULE"
 
 
-class ConfigurationStore:
+class ConfigurationManager:
     """A class that manages all Rias' configurations.
 
     This class provides access to all configurations defined in Rias'
@@ -40,15 +40,15 @@ class ConfigurationStore:
 
     .. note::
 
-        The ConfigurationStore class is designed to be used as a
-        singleton, although not completely. The instance of config store
-        is accessed via the LazyConfigurationStore class which wraps
-        this one.
+        The ConfigurationManager class is designed to be used as a
+        singleton, although not completely. The instance of config
+        manager is accessed via the LazyConfigurationManager class which
+        wraps this one.
     """
 
     def __init__(self, module: str | None) -> None:
-        """Initialize the configuration store with specified configuration
-        module.
+        """Initialize the configuration manager with specified
+        configuration module.
 
         This constructor imports default configuration values from the
         defaults module but still allowing it to be overridden by the
@@ -64,13 +64,13 @@ class ConfigurationStore:
                 setattr(self, setting, getattr(settings, setting))
 
     def __repr__(self) -> str:
-        """Return a string representation of the configuration store."""
+        """Return a string representation of the config manager."""
         if self._user_module:
-            return f"{self.__class__.__name__}({self._user_module!r})"
-        return f"{self.__class__.__name__}({defaults.__name__!r})"
+            return f"{type(self).__name__}({self._user_module!r})"
+        return f"{type(self).__name__}({defaults.__name__!r})"
 
 
-class LazyConfigurationStore(LazyLoader):
+class LazyConfigurationManager(LazyLoader):
     """A lazy proxy class for managing Rias' configurations.
 
     This class extends the ``LazyLoader`` to provide lazy loading
@@ -92,16 +92,16 @@ class LazyConfigurationStore(LazyLoader):
 
     .. note::
 
-        The LazyConfigurationStore class is designed to provide the same
-        interface as the ConfigurationStore class, forwarding all
+        The LazyConfigurationManager class is designed to provide the
+        same interface as the ConfigurationManager class, forwarding all
         attribute and method accesses to the underlying instance once it
         is initialized.
     """
 
     def _load(self) -> None:
-        """Load the underlying ConfigurationStore instance.
+        """Load the underlying ConfigurationManager instance.
 
-        This method initializes the ConfigurationStore instance and
+        This method initializes the ConfigurationManager instance and
         stores it in the _wrapped attribute. It is called automatically
         when the lazy proxy is accessed for the first time.
 
@@ -109,12 +109,13 @@ class LazyConfigurationStore(LazyLoader):
 
             This method must be implemented by subclasses of LazyLoader.
         """
-        self._wrapped = ConfigurationStore(os.environ.get(_USER_CONFIG_MODULE))
+        get = os.environ.get
+        self._wrapped = ConfigurationManager(get(_USER_CONFIG_MODULE))
 
     def __repr__(self) -> str:
-        """Return a string representation of the lazy config store."""
+        """Return a string representation of the lazy config manager."""
         if self._wrapped is empty:
-            return f"LazyConfigurationStore('default')"
+            return f"LazyConfigurationManager('default')"
         return repr(self._wrapped)
 
     def __getattr__(self, name: str) -> t.Any:
@@ -133,7 +134,7 @@ class LazyConfigurationStore(LazyLoader):
         else:
             if name not in self.__dict__:
                 raise AttributeError(
-                    "ConfigurationStore is already configured. You must set "
+                    "ConfigurationManager is already configured. You must set "
                     f"the attribute using configuration.update({name}={value})"
                 )
             self.__dict__.pop(name, None)
@@ -159,4 +160,4 @@ class LazyConfigurationStore(LazyLoader):
         return self._wrapped is not empty
 
 
-configuration = LazyConfigurationStore()
+configuration = LazyConfigurationManager()
