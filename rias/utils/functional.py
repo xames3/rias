@@ -4,7 +4,7 @@ Rias Functional Utilities
 
 Author: XA <xa@mes3.dev>
 Created on: Sunday, June 23 2024
-Last updated on: Sunday, June 23 2024
+Last updated on: Sunday, June 30 2024
 
 This module contains functional utilities for the Rias framework. These
 utilities include classes and functions that support lazy loading, proxy
@@ -15,7 +15,10 @@ from __future__ import annotations
 
 import copy
 import functools
+import importlib
+import importlib.util
 import operator
+import sys
 import typing as t
 
 T = t.TypeVar("T")
@@ -25,6 +28,52 @@ T = t.TypeVar("T")
 # initialized. It acts as a placeholder until the actual object is
 # created during the first access.
 empty = object()
+
+
+def get_cached_attribute(path: str, key: str) -> t.Callable[..., T]:
+    """Access a specified attribute from a module from cached import.
+
+    This function first checks if the module (path) is already loaded
+    and fully initialized. If the module is not loaded or is still
+    initializing, it imports the module. Then, it retrieves the specified
+    attribute from the module.
+
+    :param path: Fully qualified name of the module from which to load
+                 the attribute.
+    :param key: The name of the attribute to load from the module.
+    :returns: The specified attribute from the module.
+    """
+    if not (
+        (module := sys.modules.get(path))
+        and (spec := getattr(module, "__spec__", None))
+        and getattr(spec, "_initializing", False) is False
+    ):
+        module = importlib.import_module(path)
+    return getattr(module, key)
+
+
+def get_attribute(path: str) -> t.Callable[..., T] | None:
+    """Access attribute from a module based on the provided path.
+
+    This function takes a fully qualified path (dotted path) string that
+    specifies a module and an attribute within that module. It splits
+    the path into the module part and the attribute part, then attempts
+    to load the attribute using the `get_cached_attribute` function.
+    If the attribute cannot be found, it raises an `ImportError`.
+
+    :param path: Fully qualified path to the attribute.
+    :returns: Attribute from the module.
+    :raises ImportError: If the path is invalid or the attribute cannot
+                         be imported.
+    """
+    try:
+        path, key = path.rsplit(".", 1)
+    except ValueError as err:
+        raise ImportError(f"Module path {path!r} is not valid") from err
+    try:
+        return get_cached_attribute(path, key)
+    except AttributeError as err:
+        raise ImportError(f"Module {path!r} has no attribute {key!r}") from err
 
 
 def lazy_proxy_method(method: t.Callable[..., T]) -> t.Callable[..., T]:
