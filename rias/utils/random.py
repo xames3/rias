@@ -4,7 +4,7 @@ Rias Randomization Utilities
 
 Author: XA <xa@mes3.dev>
 Created on: Sunday, June 30 2024
-Last updated on: Sunday, June 30 2024
+Last updated on: Monday, July 01 2024
 
 This module provides utility functions for generating random strings and
 unique identifiers within the Rias framework. Under the hood, it
@@ -19,10 +19,10 @@ import secrets
 import string
 from uuid import uuid4
 
-ASCII: str = string.ascii_letters
+_ASCII: str = string.ascii_letters
 
 
-def generate_string(length: int, characters: str = ASCII) -> str:
+def generate_string(length: int, characters: str = _ASCII) -> str:
     """Generate a random string of specified length.
 
     This function creates a random string of specified length from the
@@ -52,4 +52,4 @@ def generate_secret_key() -> str:
 
 # Generate a unique identifier using the UUID version 4 standard. This is
 # useful for creating unique IDs for agents within the Rias framework.
-generate_agent_id = lambda: uuid4()
+generate_id = lambda: uuid4()

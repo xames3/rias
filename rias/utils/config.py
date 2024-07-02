@@ -4,7 +4,7 @@ Rias Configuration Management
 
 Author: XA <xa@mes3.dev>
 Created on: Sunday, June 23 2024
-Last updated on: Saturday, June 29 2024
+Last updated on: Monday, July 01 2024
 
 This module manages all configurations for the Rias framework. It
 provides access to configuration values defined in Rias' defaults module
@@ -22,7 +22,7 @@ from rias.utils import defaults
 from rias.utils.functional import LazyLoader
 from rias.utils.functional import empty
 
-VT = t.TypeVar("VT")
+_VT = t.TypeVar("_VT")
 
 _USER_CONFIG_MODULE: t.Final[str] = "USER_CONFIG_MODULE"
 
@@ -145,7 +145,7 @@ class LazyConfigurationManager(LazyLoader):
         super().__delattr__(name)
         self.__dict__.pop(name, None)
 
-    def update(self, **kwargs: VT) -> None:
+    def update(self, **kwargs: _VT) -> None:
         """Update and reconfigure store with additional options."""
         for key, value in kwargs.items():
             if key in self.__dict__:

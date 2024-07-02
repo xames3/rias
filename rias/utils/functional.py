@@ -4,7 +4,7 @@ Rias Functional Utilities
 
 Author: XA <xa@mes3.dev>
 Created on: Sunday, June 23 2024
-Last updated on: Sunday, June 30 2024
+Last updated on: Monday, July 01 2024
 
 This module contains functional utilities for the Rias framework. These
 utilities include classes and functions that support lazy loading, proxy
@@ -19,9 +19,10 @@ import importlib
 import importlib.util
 import operator
 import sys
+import types
 import typing as t
 
-T = t.TypeVar("T")
+_T = t.TypeVar("_T")
 
 # Sentinel object used to denote an uninitialized state. This unique
 # object is used to indicate that the lazy object has not been
@@ -30,7 +31,28 @@ T = t.TypeVar("T")
 empty = object()
 
 
-def get_cached_attribute(path: str, key: str) -> t.Callable[..., T]:
+def module_has_submodule(module: types.ModuleType, submodule: str) -> bool:
+    """Checks if the submodule exists within a given module.
+
+    :param module: Module in which to search for the submodule.
+    :param submodule: Submodule to check for within the module.
+    :returns: True if submodule exists within the module, else False.
+    :raises AttributeError: If the provided module does not have the
+                            necessary attributes.
+    """
+    try:
+        name = module.__name__
+        path = module.__path__
+    except AttributeError:
+        return False
+    try:
+        pkg = path[0] if len(path) == 1 else None
+        return importlib.util.find_spec(f"{name}.{submodule}", pkg) is not None
+    except ModuleNotFoundError:
+        return False
+
+
+def _get_cached_attribute(path: str, key: str) -> t.Callable[..., _T]:
     """Access a specified attribute from a module from cached import.
 
     This function first checks if the module (path) is already loaded
@@ -52,13 +74,13 @@ def get_cached_attribute(path: str, key: str) -> t.Callable[..., T]:
     return getattr(module, key)
 
 
-def get_attribute(path: str) -> t.Callable[..., T] | None:
+def get_attribute(path: str) -> t.Callable[..., _T] | None:
     """Access attribute from a module based on the provided path.
 
     This function takes a fully qualified path (dotted path) string that
     specifies a module and an attribute within that module. It splits
     the path into the module part and the attribute part, then attempts
-    to load the attribute using the `get_cached_attribute` function.
+    to load the attribute using the `_get_cached_attribute` function.
     If the attribute cannot be found, it raises an `ImportError`.
 
     :param path: Fully qualified path to the attribute.
@@ -71,12 +93,12 @@ def get_attribute(path: str) -> t.Callable[..., T] | None:
     except ValueError as err:
         raise ImportError(f"Module path {path!r} is not valid") from err
     try:
-        return get_cached_attribute(path, key)
+        return _get_cached_attribute(path, key)
     except AttributeError as err:
         raise ImportError(f"Module {path!r} has no attribute {key!r}") from err
 
 
-def lazy_proxy_method(method: t.Callable[..., T]) -> t.Callable[..., T]:
+def _lazy_proxy_method(method: t.Callable[..., _T]) -> t.Callable[..., _T]:
     """A decorator to define a lazy proxy method.
 
     This function returns a decorator that can be used to define methods
@@ -88,7 +110,7 @@ def lazy_proxy_method(method: t.Callable[..., T]) -> t.Callable[..., T]:
     """
 
     @functools.wraps(method)
-    def _proxy(self: LazyLoader, *args: t.Any, **kwargs: t.Any) -> T:
+    def _proxy(self: LazyLoader, *args: t.Any, **kwargs: t.Any) -> _T:
         if (_wrapped := self._wrapped) is empty:
             self._load()
             _wrapped = self._wrapped
@@ -156,7 +178,7 @@ class LazyLoader:
             raise AttributeError
         return value
 
-    __getattr__: t.Callable[..., t.Any] = lazy_proxy_method(getattr)
+    __getattr__: t.Callable[..., t.Any] = _lazy_proxy_method(getattr)
 
     def __setattr__(self, name: str, value: t.Any) -> None:
         """Forward attribute assignment to the underlying object.
@@ -219,24 +241,24 @@ class LazyLoader:
         return copy.deepcopy(self._wrapped, memo)
 
     __class__ = property(  # type: ignore[assignment]
-        lazy_proxy_method(operator.attrgetter("__class__"))
+        _lazy_proxy_method(operator.attrgetter("__class__"))
     )
 
-    __bool__: t.Callable[..., bool] = lazy_proxy_method(bool)
-    __bytes__: t.Callable[..., bytes] = lazy_proxy_method(bytes)
-    __str__: t.Callable[..., str] = lazy_proxy_method(str)
+    __bool__: t.Callable[..., bool] = _lazy_proxy_method(bool)
+    __bytes__: t.Callable[..., bytes] = _lazy_proxy_method(bytes)
+    __str__: t.Callable[..., str] = _lazy_proxy_method(str)
 
-    __dir__: t.Callable[..., list[str]] = lazy_proxy_method(dir)
-    __hash__: t.Callable[..., int] = lazy_proxy_method(hash)
-    __iter__: t.Callable[..., t.Any] = lazy_proxy_method(iter)
-    __len__: t.Callable[..., int] = lazy_proxy_method(len)
+    __dir__: t.Callable[..., list[str]] = _lazy_proxy_method(dir)
+    __hash__: t.Callable[..., int] = _lazy_proxy_method(hash)
+    __iter__: t.Callable[..., t.Any] = _lazy_proxy_method(iter)
+    __len__: t.Callable[..., int] = _lazy_proxy_method(len)
 
-    __contains__: t.Callable[..., bool] = lazy_proxy_method(operator.contains)
-    __delitem__: t.Callable[..., None] = lazy_proxy_method(operator.delitem)
-    __getitem__: t.Callable[..., t.Any] = lazy_proxy_method(operator.getitem)
-    __setitem__: t.Callable[..., None] = lazy_proxy_method(operator.setitem)
+    __contains__: t.Callable[..., bool] = _lazy_proxy_method(operator.contains)
+    __delitem__: t.Callable[..., None] = _lazy_proxy_method(operator.delitem)
+    __getitem__: t.Callable[..., t.Any] = _lazy_proxy_method(operator.getitem)
+    __setitem__: t.Callable[..., None] = _lazy_proxy_method(operator.setitem)
 
-    __eq__: t.Callable[..., bool] = lazy_proxy_method(operator.eq)
-    __gt__: t.Callable[..., bool] = lazy_proxy_method(operator.gt)
-    __lt__: t.Callable[..., bool] = lazy_proxy_method(operator.lt)
-    __ne__: t.Callable[..., bool] = lazy_proxy_method(operator.ne)
+    __eq__: t.Callable[..., bool] = _lazy_proxy_method(operator.eq)
+    __gt__: t.Callable[..., bool] = _lazy_proxy_method(operator.gt)
+    __lt__: t.Callable[..., bool] = _lazy_proxy_method(operator.lt)
+    __ne__: t.Callable[..., bool] = _lazy_proxy_method(operator.ne)
