@@ -4,7 +4,7 @@ Rias Custom Exceptions
 
 Author: XA <xa@mes3.dev>
 Created on: Sunday, June 23 2024
-Last updated on: Sunday, June 30 2024
+Last updated on: Sunday, July 07 2024
 
 This module defines custom exception classes for the Rias framework.
 These exceptions are used throughout the Rias framework to handle
@@ -20,7 +20,7 @@ class RiasException(Exception):
     pass
 
 
-class ConfigurationError(RiasException):
-    """Rias' configuration is incorrectly set."""
+class RiasEnvironmentError(RiasException):
+    """Rias' environment is incorrectly configured."""
 
     pass
