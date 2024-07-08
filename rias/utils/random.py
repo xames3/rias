@@ -4,7 +4,7 @@ Rias Randomization Utilities
 
 Author: XA <xa@mes3.dev>
 Created on: Sunday, June 30 2024
-Last updated on: Monday, July 01 2024
+Last updated on: Sunday, July 07 2024
 
 This module provides utility functions for generating random strings and
 unique identifiers within the Rias framework. Under the hood, it
@@ -31,8 +31,8 @@ def generate_string(length: int, characters: str = _ASCII) -> str:
 
     :param length: The length of the random string to generate.
     :param characters: The string of characters to use for generating
-                       the random string, defaults to ASCII letters.
-    :returns: A random string of the specified length.
+        the random string, defaults to ASCII letters.
+    :return: A random string of the specified length.
     """
     return "".join(secrets.choice(characters) for _ in range(length))
 
@@ -44,7 +44,7 @@ def generate_secret_key() -> str:
     predefined set of characters. The character set includes lowercase
     letters, digits, and special characters.
 
-    :returns: A random secret key of length 50.
+    :return: A random secret key of length 50.
     """
     characters = "abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)"
     return generate_string(50, characters)

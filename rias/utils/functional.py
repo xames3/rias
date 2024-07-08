@@ -4,7 +4,7 @@ Rias Functional Utilities
 
 Author: XA <xa@mes3.dev>
 Created on: Sunday, June 23 2024
-Last updated on: Monday, July 01 2024
+Last updated on: Sunday, July 07 2024
 
 This module contains functional utilities for the Rias framework. These
 utilities include classes and functions that support lazy loading, proxy
@@ -36,9 +36,9 @@ def module_has_submodule(module: types.ModuleType, submodule: str) -> bool:
 
     :param module: Module in which to search for the submodule.
     :param submodule: Submodule to check for within the module.
-    :returns: True if submodule exists within the module, else False.
+    :return: True if submodule exists within the module, else False.
     :raises AttributeError: If the provided module does not have the
-                            necessary attributes.
+        necessary attributes.
     """
     try:
         name = module.__name__
@@ -61,9 +61,9 @@ def _get_cached_attribute(path: str, key: str) -> t.Callable[..., _T]:
     attribute from the module.
 
     :param path: Fully qualified name of the module from which to load
-                 the attribute.
+        the attribute.
     :param key: The name of the attribute to load from the module.
-    :returns: The specified attribute from the module.
+    :return: The specified attribute from the module.
     """
     if not (
         (module := sys.modules.get(path))
@@ -84,9 +84,9 @@ def get_attribute(path: str) -> t.Callable[..., _T] | None:
     If the attribute cannot be found, it raises an `ImportError`.
 
     :param path: Fully qualified path to the attribute.
-    :returns: Attribute from the module.
+    :return: Attribute from the module.
     :raises ImportError: If the path is invalid or the attribute cannot
-                         be imported.
+        be imported.
     """
     try:
         path, key = path.rsplit(".", 1)
@@ -129,8 +129,8 @@ class LazyLoader:
     underlying object once it is initialized.
 
     :var _wrapped: The underlying object (module, function or class)
-                   that is going to be wrapped by the child class or
-                   lazily loaded, defaults to None.
+        that is going to be wrapped by the child class or lazily loaded,
+        defaults to None.
     """
 
     _wrapped: object | None = None
@@ -231,7 +231,7 @@ class LazyLoader:
         uninitialized. Otherwise, the deep copy is of the loaded object.
 
         :param memo: A dictionary of objects already copied during the
-                     current copying pass.
+            current copying pass.
         :return: A deep copy of the lazy loader.
         """
         if self._wrapped is empty:
@@ -262,3 +262,6 @@ class LazyLoader:
     __gt__: t.Callable[..., bool] = _lazy_proxy_method(operator.gt)
     __lt__: t.Callable[..., bool] = _lazy_proxy_method(operator.lt)
     __ne__: t.Callable[..., bool] = _lazy_proxy_method(operator.ne)
+
+
+bold = lambda msg: f"\x1b[38;5;231m{msg}\x1b[0m"
