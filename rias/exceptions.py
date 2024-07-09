@@ -81,7 +81,7 @@ def exception_hook(
             (
                 "\N{box drawings light up and right}"
                 "\N{box drawings light left}"
-                f'At "{os.path.relpath(filename)}:{traceback.tb_lineno}" '
+                f'At "{filename}:{traceback.tb_lineno}" '
                 f"in {module}{f'.{name}' if name else ''}\n"
             )
         )
