@@ -4,7 +4,7 @@ Rias Core Agent & Management
 
 Author: XA <xa@mes3.dev>
 Created on: Sunday, June 30 2024
-Last updated on: Tuesday, July 09 2024
+Last updated on: Sunday, July 14 2024
 """
 
 from __future__ import annotations
@@ -22,6 +22,10 @@ from rias.utils.functional import module_has_submodule
 # complicated to better suit the developers narratives. But for now,
 # it's fine to move forward with this patchy implementation.
 _AGENTS_MODULE: t.Literal["agents"] = "agents"
+
+
+class Agent:
+    pass
 
 
 class AgentManager:
@@ -52,6 +56,9 @@ class AgentManager:
         # critical purposes:
         #   - Prevent accidental access
         #   - Indicate initialization state
+        # TODO (xames3): Add proper type hint for `_workflow_mapping`
+        # when worflows are defined. Ideally it should be a mapping of
+        # `dict[str, Workflow]` and not `Agent`.
         self._workflow_mapping = None
         self._workflow_module = None
         # A reference to the agents registry that manages this
@@ -191,6 +198,44 @@ class AgentManager:
             )
         return agent_manager(agent_name, agent_module)
 
+    def get_workflow(self, workflow: str, loaded: bool = True) -> Agent:
+        """Retrieve a workflow by its name, with an optional check for
+        whether it has been loaded.
 
-class Agent:
-    pass
+        This method allows retrieval of a workflow from the internal
+        mapping by its name. It includes an optional parameter to
+        specify whether to check if the workflow or agent has been loaded
+        before attempting retrieval. This ensures that workflows are
+        accessed only if they meet the specified loading criteria,
+        thereby maintaining the integrity and state of the workflows
+        within the system.
+
+        :param workflow: The name of the workflow to be retrieved.
+        :param loaded: A flag indicating whether to check if the workflow
+            (if True) or agent (if False) has been loaded before
+            retrieval, defaults to True.
+        :return: Workflow (agent) associated with the specified name.
+        :raises LookupError: If the workflow name is not found in the
+            internal mapping.
+
+        .. note::
+
+            [1] The workflow names are stored in a case-insensitive
+                manner, and thus the lookup is performed using the
+                lowercase version of the provided name.
+            [2] Ensure that the appropriate workflows or agents are
+                loaded into the registry before attempting to retrieve
+                them using this method.
+        """
+        if loaded:
+            self._registry.are_workflows_loaded()
+        else:
+            self._registry.are_agents_loaded()
+        try:
+            return self._workflow_mapping[workflow.lower()]
+        except KeyError:
+            raise LookupError(
+                f"Workflow (agent) {workflow!r} not found in the registry."
+                " Ensure it is correctly loaded and the name is spelled"
+                " correctly."
+            )
