@@ -115,7 +115,7 @@ class LazyEnvironmentManager(LazyLoader):
     def __repr__(self) -> str:
         """Return a string representation of the lazy env manager."""
         if self._wrapped is empty:
-            return f"LazyEnvironmentManager('default')"
+            return "LazyEnvironmentManager('default')"
         return repr(self._wrapped)
 
     def __getattr__(self, name: str) -> t.Any:
