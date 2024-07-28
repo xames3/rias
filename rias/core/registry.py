@@ -4,29 +4,45 @@ Rias Components & Management
 
 Author: XA <xa@mes3.dev>
 Created on: Sunday, June 30 2024
-Last updated on: Saturday, July 27 2024
+Last updated on: Sunday, July 28 2024
 """
 
 from __future__ import annotations
 
 import inspect
+import sys
 import types
 import typing as t
+from collections import defaultdict
 from importlib import import_module
 
 from rias.exceptions import RiasEnvironmentError
 from rias.utils.functional import get_attribute
 from rias.utils.functional import module_has_submodule
+from rias.workflows.core import Workflow
 
-# NOTE (xames3): This is bound to change as the API gets more
-# complicated to better suit the developers narratives. But for now,
-# it's fine to move forward with this patchy implementation.
-_COMPONENTS_MODULE: t.Literal["components"] = "components"
-_WORKFLOWS_MODULE: t.Literal["workflows"] = "workflows"
+WM = dict[str, type[Workflow]]
 
 
 class Components:
-    pass
+    """A registry that stores the configuration of installed components
+    within the Rias framework.
+    """
+
+    def __init__(
+        self, managers: t.Iterable[ComponentManager | str] | None = ()
+    ) -> None:
+        """Initialize the components with registered components."""
+        if managers is None and hasattr(sys.modules[__name__], "components"):
+            raise RuntimeError("You must supply 'managers' argument.")
+        self.workflows: t.DefaultDict[str, WM] = defaultdict(dict)
+        self.manangers: dict[str, ComponentManager] = {}
+
+    def are_workflows_loaded(self) -> None:
+        ...
+
+    def are_components_loaded(self) -> None:
+        ...
 
 
 class ComponentManager:
@@ -39,29 +55,25 @@ class ComponentManager:
     :param module: Root module for the component.
     """
 
-    name: str
+    alias: str
 
     def __init__(self, name: str, module: types.ModuleType) -> None:
         """Initialize the manager with a name and it's module."""
-        self._component_name = name.rpartition(".")[2]
-        self._component_module = module
-        if not self._component_name.isidentifier():
+        self.name = name.rpartition(".")[2]
+        self.module = module
+        if not self.name.isidentifier():
             raise RiasEnvironmentError(
                 f"ComponentManager, {type(self).__qualname__!r} has an"
                 " attribute name which is not a valid Python identifier"
             )
         # NOTE (xames3): Mapping of workflow to their respective workflow
         # classes. This mapping enables the dynamic retrieval and
-        # instantiation of workflow classes by their names. Initially,
-        # it is set to `None`. The deliberate initialization serves two
-        # critical purposes:
+        # instantiation of workflow classes by their names. The
+        # deliberate initialization serves two critical purposes:
         #   - Prevent accidental access
         #   - Indicate initialization state
-        # TODO (xames3): Add proper type hint for `_workflow_mapping`
-        # when worflows are defined. Ideally it should be a mapping of
-        # `dict[str, Workflow]` and not `Components`.
-        self._workflow_mapping = None
-        self._workflow_module = None
+        self.workflow_mapping: WM = {}
+        self.workflow_module: types.ModuleType | None = None
         # A reference to the components registry that manages this
         # `ComponentManager` instance. This reference is assigned by the
         # registry itself when the `ComponentManager` instance is
@@ -71,11 +83,11 @@ class ComponentManager:
         # reference, the registry allows the `ComponentManager` to
         # access the registry's functionalities, enabling efficient
         # communication and coordination among different components.
-        self._registry: Components | None = None
+        self.components: Components | None = None
 
     def __repr__(self) -> str:
         """Return a string representation of the component manager."""
-        return f"{type(self).__name__}({self._component_name!r})"
+        return f"{type(self).__name__}({self.name!r})"
 
     @classmethod
     def create(cls, hook: str) -> ComponentManager:
@@ -105,8 +117,8 @@ class ComponentManager:
             # manager classes.
             # NOTE (xames3): This is not a guaranteed mechanism and
             # might change in future.
-            if module_has_submodule(component_module, _COMPONENTS_MODULE):
-                module = import_module(f"{hook}.{_COMPONENTS_MODULE}")
+            if module_has_submodule(component_module, "components"):
+                module = import_module(f"{hook}.components")
                 # Inspect the module to find all classes that are
                 # subclasses of `ComponentManager`. Filter these classes
                 # to include only those that have the `primary`
@@ -161,16 +173,16 @@ class ComponentManager:
             path, _, component = hook.rpartition(".")
             if path and component[0].isupper():
                 module = import_module(path)
-                managers = [
-                    repr(name)  # type: ignore[misc]
+                available = [
+                    repr(name)
                     for name, instance in inspect.getmembers(
                         module, inspect.isclass
                     )
                     if issubclass(instance, cls) and instance is not cls
                 ]
                 err = f"Couldn't find class {component!r} in module {path!r}. "
-                if managers:
-                    err += f"Available managers are: {', '.join(managers)}"  # type: ignore[arg-type]
+                if available:
+                    err += f"Available managers are: {', '.join(available)}"
                 raise ImportError(err)
             else:
                 import_module(hook)
@@ -182,12 +194,11 @@ class ComponentManager:
             )
         if component_name is None:
             try:
-                component_name = component_manager.name
+                component_name = component_manager.alias
             except AttributeError:
                 raise RiasEnvironmentError(
-                    f"The specified component manager {hook!r} does not have a"
-                    " name attribute. Ensure the component manager class"
-                    " defines a 'name' attribute"
+                    f"The specified component manager {hook!r} does not have"
+                    " an 'alias' attribute"
                 )
         try:
             component_module = import_module(component_name)
@@ -199,7 +210,9 @@ class ComponentManager:
             )
         return component_manager(component_name, component_module)
 
-    def get_workflow(self, workflow: str, loaded: bool = True) -> Components:
+    def get_workflow(
+        self, workflow: str, loaded: bool = True
+    ) -> type[Workflow]:
         """Retrieve a workflow by its name, with an optional check for
         whether it has been loaded.
 
@@ -228,17 +241,18 @@ class ComponentManager:
                 loaded into the registry before attempting to retrieve
                 them using this method.
         """
+        assert self.components is not None
         if loaded:
-            self._registry.are_workflows_loaded()
+            self.components.are_workflows_loaded()
         else:
-            self._registry.are_components_loaded()
+            self.components.are_components_loaded()
         try:
-            return self._workflow_mapping[workflow.lower()]
+            return self.workflow_mapping[workflow.lower()]
         except KeyError:
             raise LookupError(
                 f"Workflow (component) {workflow!r} not found in the registry."
                 " Ensure it is correctly loaded and the name is spelled"
-                " correctly."
+                " correctly"
             )
 
     def load_workflows(self) -> None:
@@ -263,8 +277,8 @@ class ComponentManager:
                 required. Otherwise, the method relies solely on the
                 registry's workflows mapping.
         """
-        self._workflow_mapping = self._registry.workflows[self._component_name]
-        if module_has_submodule(self._component_module, _WORKFLOWS_MODULE):
-            self._workflow_module = import_module(
-                f"{self._component_name}.{_WORKFLOWS_MODULE}"
-            )
+        assert self.components is not None
+        assert self.workflow_module is not None
+        self.workflow_mapping = self.components.workflows[self.name]
+        if module_has_submodule(self.module, "workflows"):
+            self.workflow_module = import_module(f"{self.name}.workflows")
