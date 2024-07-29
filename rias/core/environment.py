@@ -4,7 +4,7 @@ Rias Environment Management
 
 Author: XA <xa@mes3.dev>
 Created on: Sunday, June 23 2024
-Last updated on: Sunday, July 07 2024
+Last updated on: Sunday, July 28 2024
 
 This module manages a default-state environment (configurations) for the
 Rias framework. It provides access to configurations or settings defined
@@ -22,9 +22,9 @@ from rias.utils import defaults
 from rias.utils.functional import LazyLoader
 from rias.utils.functional import empty
 
-_V = t.TypeVar("_V")
+V = t.TypeVar("V")
 
-_USER_ENVIRONMENT_MODULE: t.Final[str] = "USER_ENVIRONMENT_MODULE"
+USER_ENVIRONMENT_MODULE: str = "USER_ENVIRONMENT_MODULE"
 
 
 class EnvironmentManager:
@@ -35,7 +35,7 @@ class EnvironmentManager:
     for dynamic access to these settings, default values, and provides
     methods for managing and updating configurations during runtime.
 
-    :var _overridden: Set to track overridden configuration attributes.
+    :var overridden: Set to track overridden configuration attributes.
     :param module: Path to the user-defined environment module.
 
     .. note::
@@ -56,17 +56,17 @@ class EnvironmentManager:
         """
         for default in dir(defaults):
             setattr(self, default, getattr(defaults, default))
-        self.__dict__["_overridden"] = set()
-        self._user_module = module
-        if self._user_module:
-            settings = importlib.import_module(self._user_module)
+        self.__dict__["overridden"] = set()
+        self.user_module = module
+        if self.user_module:
+            settings = importlib.import_module(self.user_module)
             for setting in dir(settings):
                 setattr(self, setting, getattr(settings, setting))
 
     def __repr__(self) -> str:
         """Return a string representation of the environment manager."""
-        if self._user_module:
-            return f"{type(self).__name__}({self._user_module!r})"
+        if self.user_module:
+            return f"{type(self).__name__}({self.user_module!r})"
         return f"{type(self).__name__}({defaults.__name__!r})"
 
 
@@ -97,11 +97,11 @@ class LazyEnvironmentManager(LazyLoader):
         is initialized.
     """
 
-    def _load(self) -> None:
+    def load(self) -> None:
         """Load the underlying EnvironmentManager instance.
 
         This method initializes the EnvironmentManager instance and
-        stores it in the `_wrapped` attribute. It is called
+        stores it in the `wrapped` attribute. It is called
         automatically when the lazy proxy is accessed for the first time.
 
         .. note::
@@ -110,26 +110,26 @@ class LazyEnvironmentManager(LazyLoader):
             `LazyLoader`.
         """
         get = os.environ.get
-        self._wrapped = EnvironmentManager(get(_USER_ENVIRONMENT_MODULE))
+        self.wrapped = EnvironmentManager(get(USER_ENVIRONMENT_MODULE))
 
     def __repr__(self) -> str:
         """Return a string representation of the lazy env manager."""
-        if self._wrapped is empty:
+        if self.wrapped is empty:
             return "LazyEnvironmentManager('default')"
-        return repr(self._wrapped)
+        return repr(self.wrapped)
 
     def __getattr__(self, name: str) -> t.Any:
         """Retrieve the value of a setting and cache it."""
-        if (_wrapped := self._wrapped) is empty:
-            self._load()
-            _wrapped = self._wrapped
-        value = getattr(_wrapped, name)
+        if (wrapped := self.wrapped) is empty:
+            self.load()
+            wrapped = self.wrapped
+        value = getattr(wrapped, name)
         self.__dict__[name] = value
         return value
 
     def __setattr__(self, name: str, value: t.Any) -> None:
         """Set the value of a setting to override."""
-        if name == "_wrapped":
+        if name == "wrapped":
             self.__dict__.clear()
         else:
             if name not in self.__dict__:
@@ -145,11 +145,11 @@ class LazyEnvironmentManager(LazyLoader):
         super().__delattr__(name)
         self.__dict__.pop(name, None)
 
-    def update(self, **kwargs: _V) -> None:
+    def update(self, **kwargs: V) -> None:
         """Update and reconfigure manager with additional options."""
         for key, value in kwargs.items():
             if key in self.__dict__:
-                self._overridden.add(key)
+                self.overridden.add(key)
             else:
                 self.__dict__[key] = object()
             setattr(self, key, value)
@@ -157,7 +157,7 @@ class LazyEnvironmentManager(LazyLoader):
     @property
     def configured(self) -> bool:
         """Return True if the values have already been configured."""
-        return self._wrapped is not empty
+        return self.wrapped is not empty
 
 
 environment = LazyEnvironmentManager()
